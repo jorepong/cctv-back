@@ -15,6 +15,8 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+CCTV_STREAMS_CONFIG_PATH = BASE_DIR / 'config' / 'cctv_streams.yaml'
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -36,6 +38,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'cameras.apps.CamerasConfig',
+    'analytics.apps.AnalyticsConfig',
+    'dashboard_api.apps.DashboardApiConfig',
+    'core.apps.CoreConfig',
 ]
 
 MIDDLEWARE = [
