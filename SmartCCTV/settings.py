@@ -10,7 +10,10 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
+import traceback
 from pathlib import Path
+from sshtunnel import SSHTunnelForwarder
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -42,6 +45,7 @@ INSTALLED_APPS = [
     'analytics.apps.AnalyticsConfig',
     'dashboard_api.apps.DashboardApiConfig',
     'core.apps.CoreConfig',
+    # 'analytics',
 ]
 
 MIDDLEWARE = [
@@ -75,15 +79,122 @@ TEMPLATES = [
 WSGI_APPLICATION = 'SmartCCTV.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+# --- SSH 터널 및 데이터베이스 설정 시작 ---
+
+# SSH 터널 정보
+SSH_HOST = '34.22.83.144'
+SSH_PORT = 22
+SSH_USERNAME = 'jopago'
+
+# --- SSH 개인 키 설정 ---
+# 로컬 머신에 있는 SSH 개인 키 파일의 *절대 경로*를 지정합니다.
+# 예: '/home/your_user/.ssh/id_rsa' 또는 'C:/Users/your_user/.ssh/id_rsa'
+# os.path.expanduser를 사용하면 '~' (홈 디렉토리)를 올바르게 확장할 수 있습니다.
+# **보안을 위해 이 경로도 환경 변수에서 읽어오는 것이 가장 좋습니다.**
+SSH_PRIVATE_KEY_PATH = os.getenv(
+    'SSH_PRIVATE_KEY_PATH', # 환경 변수 이름 (예시)
+    os.path.expanduser('C:\\Users\\JOPAGO\\.ssh\\id_ecdsa') # 기본값: 실제 키 파일 경로로 변경!
+)
+
+# 개인 키 파일에 암호(passphrase)가 설정되어 있다면 여기에 입력합니다.
+# 암호가 없다면 이 변수를 사용하지 않거나 None으로 설정합니다.
+# **이 값 또한 환경 변수에서 읽어오는 것이 가장 좋습니다.**
+# SSH_PRIVATE_KEY_PASSWORD = os.getenv(
+#     'SSH_PRIVATE_KEY_PASSPHRASE', # 환경 변수 이름 (예시)
+#     None # 개인 키에 암호가 없다면 None, 있다면 실제 암호 또는 환경 변수에서 로드
+# )
+# 예시: SSH_PRIVATE_KEY_PASSWORD = 'your_key_passphrase_if_any'
+
+# MySQL 정보 (Debian 서버 내부 기준)
+MYSQL_HOST_ON_DEBIAN = '127.0.0.1'
+MYSQL_PORT_ON_DEBIAN = 3306
+MYSQL_USERNAME = 'root'
+MYSQL_PASSWORD = '1234'
+MYSQL_DATABASE_NAME = 'campus_crowd_db'
+
+# 로컬에서 사용할 포트 (터널의 로컬 끝점)
+LOCAL_BIND_PORT = 3307
+
+ssh_tunnel_server = None
+
+def start_ssh_tunnel():
+    global ssh_tunnel_server
+    if ssh_tunnel_server and ssh_tunnel_server.is_active:
+        print("SSH 터널이 이미 활성 상태입니다. 새로운 연결을 시도하지 않습니다.")
+        return True
+    try:
+        if not os.path.exists(SSH_PRIVATE_KEY_PATH):
+            raise FileNotFoundError(f"SSH 개인 키 파일을 찾을 수 없습니다: {SSH_PRIVATE_KEY_PATH}")
+
+        print(SSH_PRIVATE_KEY_PATH)
+
+        ssh_tunnel_server = SSHTunnelForwarder(
+            (SSH_HOST, SSH_PORT),
+            ssh_username=SSH_USERNAME,
+            ssh_pkey=SSH_PRIVATE_KEY_PATH,                # 개인 키 파일 경로
+            remote_bind_address=(MYSQL_HOST_ON_DEBIAN, MYSQL_PORT_ON_DEBIAN),
+            local_bind_address=('127.0.0.1', LOCAL_BIND_PORT)
+        )
+        ssh_tunnel_server.start()
+        print(f"SSH 터널 (키 사용)이 127.0.0.1:{LOCAL_BIND_PORT}에서 {MYSQL_HOST_ON_DEBIAN}:{MYSQL_PORT_ON_DEBIAN} (원격)으로 연결되었습니다.")
+        return True
+    except Exception as e:
+        print(f"SSH 터널 시작 실패: {e}")
+        traceback.print_exc() # 상세한 오류 정보를 보려면 주석 해제
+        ssh_tunnel_server = None
+        return False
+
+# ... (이전과 동일한 터널 시작/종료 로직 및 DATABASES 설정) ...
+# DEBUG = True 일 때 (개발 환경) Django 개발 서버 시작 시 터널을 열도록 설정합니다.
+import sys
+if 'runserver' in sys.argv or 'shell' in sys.argv or 'makemigrations' in sys.argv or 'migrate' in sys.argv:
+    if not start_ssh_tunnel():
+        print("경고: SSH 터널을 시작할 수 없어 데이터베이스 연결에 실패할 수 있습니다.")
+        # 필요하다면 여기서 sys.exit(1) 등으로 애플리케이션 실행을 중단할 수 있습니다.
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': MYSQL_DATABASE_NAME,
+        'USER': MYSQL_USERNAME,
+        'PASSWORD': MYSQL_PASSWORD,
+        'HOST': '127.0.0.1',
+        'PORT': str(LOCAL_BIND_PORT),
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+        },
     }
 }
+
+import atexit
+# import traceback # 상세 오류 로깅을 위해 추가할 수 있음
+
+def stop_ssh_tunnel():
+    global ssh_tunnel_server
+    if ssh_tunnel_server and ssh_tunnel_server.is_active:
+        print("애플리케이션 종료 시 SSH 터널을 닫습니다...")
+        ssh_tunnel_server.stop()
+        print("SSH 터널이 닫혔습니다.")
+
+# ssh_tunnel_server 객체가 성공적으로 생성되었을 때만 atexit에 등록
+# start_ssh_tunnel 함수가 True를 반환했을 때 (즉, 터널이 시작되었거나 이미 활성 상태일 때)
+# 또는 ssh_tunnel_server가 None이 아닐 때 등록하는 것이 안전합니다.
+# 현재 로직에서는 start_ssh_tunnel이 호출된 후 ssh_tunnel_server가 None이 아닐 수 있으므로,
+# 아래와 같이 유지하거나, start_ssh_tunnel 호출 후 객체 상태를 보고 등록할 수 있습니다.
+if ssh_tunnel_server: # 이 시점에서는 start_ssh_tunnel 호출 전이므로 항상 None일 수 있습니다.
+                    # 따라서 atexit 등록은 start_ssh_tunnel 호출 이후 또는
+                    # stop_ssh_tunnel 함수 내부에서 ssh_tunnel_server 유효성 검사를 하는 것이 좋습니다.
+                    # 현재 코드는 stop_ssh_tunnel 내부에서 이미 검사하고 있으므로 문제는 없습니다.
+    atexit.register(stop_ssh_tunnel)
+else:
+    # start_ssh_tunnel이 아직 호출되지 않았거나 실패한 경우를 대비해
+    # 프로그램 종료 시 터널 상태를 다시 한번 확인하고 닫도록 atexit.register를 호출합니다.
+    # 이는 이미 stop_ssh_tunnel 함수 내에서 ssh_tunnel_server 유효성 검사를 하므로
+    # 현재 상태로도 괜찮습니다.
+    # 명시적으로 하고 싶다면, 터널 시작 로직 아래에 atexit.register를 위치시키는 방법도 있습니다.
+    pass
+
+# --- SSH 터널 및 데이터베이스 설정 끝 ---
 
 
 # Password validation
