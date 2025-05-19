@@ -149,47 +149,23 @@ def start_ssh_tunnel():
         tunnel_active_and_configured = False
         return False
 
-# 특정 manage.py 명령어 실행 시에만 터널 시도
-db_related_commands = ['runserver', 'shell', 'makemigrations', 'migrate', 'dbshell', 'createsuperuser']
-should_attempt_tunnel_start = any(cmd in sys.argv for cmd in db_related_commands)
-
-if should_attempt_tunnel_start:
-    start_ssh_tunnel() # 터널 시작 시도
+# start_ssh_tunnel() # 터널 시작 시도
 
 # 데이터베이스 설정
-if tunnel_active_and_configured:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.mysql',
-            'NAME': MYSQL_DATABASE_NAME,
-            'USER': MYSQL_USERNAME_DB,
-            'PASSWORD': MYSQL_PASSWORD_DB,
-            'HOST': '127.0.0.1',  # SSH 터널의 로컬 바인딩 주소
-            'PORT': str(LOCAL_BIND_PORT),  # SSH 터널의 로컬 바인딩 포트
-            'OPTIONS': {
-                'charset': 'utf8mb4',
-                # 'init_command': "SET sql_mode='STRICT_TRANS_TABLES'", # 필요시 MySQL 모드 설정
-            },
-        }
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': MYSQL_DATABASE_NAME,
+        'USER': MYSQL_USERNAME_DB,
+        'PASSWORD': MYSQL_PASSWORD_DB,
+        'HOST': '127.0.0.1',  # SSH 터널의 로컬 바인딩 주소
+        'PORT': str(LOCAL_BIND_PORT),  # SSH 터널의 로컬 바인딩 포트
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+            # 'init_command': "SET sql_mode='STRICT_TRANS_TABLES'", # 필요시 MySQL 모드 설정
+        },
     }
-    # 만약 .env 파일에 DATABASE_URL이 설정되어 있다면, 위 DATABASES 설정을 덮어쓸 수 있습니다.
-    # if env('DATABASE_URL', default=None):
-    #     DATABASES = {'default': env.db()}
-elif DEBUG and not should_attempt_tunnel_start: # 터널 시도 명령이 아니고 DEBUG 모드일 때
-    print("DB 관련 명령이 아니므로 SSH 터널을 시작하지 않았습니다. 필요한 경우 DB 설정이 비어있을 수 있습니다.")
-    DATABASES = {} # 또는 SQLite 대체 설정
-else: # 터널이 필요했으나 설정되지 않았거나 실패한 경우
-    print("경고: SSH 터널이 활성화되지 않았거나 데이터베이스 정보가 부족합니다. 애플리케이션이 DB에 정상적으로 연결되지 않을 수 있습니다.")
-    # 개발 편의를 위해 SQLite로 대체하거나, 에러를 발생시킬 수 있습니다.
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-            'COMMENT': 'Fallback DB. Configure .env for MariaDB via SSH tunnel for full functionality.',
-        }
-    }
-    if should_attempt_tunnel_start: # 터널이 필요한 상황이었음을 명시
-         print("-> SSH 터널 및 데이터베이스 설정을 .env 파일에서 확인하고 애플리케이션을 재시작하세요.")
+}
 
 
 def stop_ssh_tunnel():

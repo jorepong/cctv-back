@@ -4,12 +4,13 @@ import os
 import sys
 import traceback
 
-# from SmartCCTV.settings import start_ssh_tunnel
+from SmartCCTV.settings import start_ssh_tunnel
 
 
 def main():
     """Run administrative tasks."""
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'SmartCCTV.settings')
+    start_ssh_tunnel()
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
