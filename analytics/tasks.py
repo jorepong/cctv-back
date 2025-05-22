@@ -4,7 +4,7 @@ import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'SmartCCTV.settings')
 django.setup()
 
-from SmartCCTV.settings import start_ssh_tunnel
+from SmartCCTV.settings.local import start_ssh_tunnel
 start_ssh_tunnel()
 
 import subprocess
@@ -23,7 +23,8 @@ def capture_snapshot_with_ffmpeg(camera_id: int):
     timestamp = timezone.now()
     timestamp_str = timestamp.strftime('%Y%m%d_%H%M%S')
 
-    cam_dir = Path(settings.MEDIA_ROOT) / str(camera.camera_id)
+    # ✅ 이렇게 해야 함 (MEDIA_ROOT를 기준으로 상대 경로 이어붙이기)
+    cam_dir = Path(settings.MEDIA_ROOT) / "captured" / str(camera.camera_id)
     cam_dir.mkdir(parents=True, exist_ok=True)
 
     video_path = cam_dir / f"{timestamp_str}.mp4"

@@ -225,6 +225,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 if socket.gethostname() == 'cctv':
-    MEDIA_ROOT = Path("/home/tndusslarj/snapshots")
+    MEDIA_ROOT = Path("/home/tndusslarj")
 else:
-    MEDIA_ROOT = BASE_DIR / "media"
+    MEDIA_ROOT = BASE_DIR
