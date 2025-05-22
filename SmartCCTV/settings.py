@@ -7,6 +7,7 @@ import environ  # django-environ 임포트
 from sshtunnel import SSHTunnelForwarder
 import sys
 import atexit
+import socket
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -219,3 +220,9 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+if socket.gethostname() == 'cctv':
+    MEDIA_ROOT = Path("/home/tndusslarj/snapshots")
+else:
+    MEDIA_ROOT = BASE_DIR / "media"
