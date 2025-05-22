@@ -1,88 +1,15 @@
-# SmartCCTV/settings.py
-
-import os
-import traceback
-from pathlib import Path
-import environ  # django-environ 임포트
+# SmartCCTV/settings/local.py
+from .base import *
 from sshtunnel import SSHTunnelForwarder
 import sys
 import atexit
+import traceback
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+# 로컬 .env 파일 로드 (BASE_DIR의 .env)
+environ.Env.read_env(str(BASE_DIR / '.env'))
 
-# django-environ 초기화
-env = environ.Env(
-    # (타입, 기본값)
-    DEBUG=(bool, False),  # DEBUG 기본값은 False (프로덕션 환경 고려)
-    SSH_PORT=(int, 22),
-    MYSQL_PORT_ON_DEBIAN=(int, 3306),
-    LOCAL_BIND_PORT=(int, 3309),
-    # DATABASE_URL=(str, None) # DATABASE_URL을 사용할 경우
-)
-
-# .env 파일 읽기 (BASE_DIR에 .env 파일이 있다고 가정)
-# 파일이 존재하지 않아도 오류를 발생시키지 않음
-ENV_FILE_PATH = BASE_DIR / '.env'
-if ENV_FILE_PATH.exists():
-    environ.Env.read_env(str(ENV_FILE_PATH))
-else:
-    print(f"Warning: .env file not found at {ENV_FILE_PATH}. Using environment variables or defaults.")
-
-
-CCTV_STREAMS_CONFIG_PATH = BASE_DIR / 'config' / 'cctv_streams.yaml'
-
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env('SECRET_KEY')  # .env 또는 환경변수에서 로드 (필수)
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env('DEBUG')
-
+DEBUG = True
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost'])
-
-# Application definition
-INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'cameras.apps.CamerasConfig',
-    'analytics.apps.AnalyticsConfig',
-    'dashboard_api.apps.DashboardApiConfig',
-    'core.apps.CoreConfig',
-]
-
-MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-]
-
-ROOT_URLCONF = 'SmartCCTV.urls'
-
-TEMPLATES = [
-    {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug', # DEBUG True일 때 유용
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
-            ],
-        },
-    },
-]
-
-WSGI_APPLICATION = 'SmartCCTV.wsgi.application'
 
 # --- SSH 터널 및 데이터베이스 설정 시작 ---
 
@@ -183,41 +110,3 @@ if ssh_tunnel_server and ssh_tunnel_server.is_active:
     atexit.register(stop_ssh_tunnel)
 
 start_ssh_tunnel()
-
-# --- SSH 터널 및 데이터베이스 설정 끝 ---
-
-# Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
-
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
-]
-
-# Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
-
-LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
-USE_I18N = True
-USE_TZ = True
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-
-STATIC_URL = 'static/'
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
-
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
