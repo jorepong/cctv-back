@@ -1,0 +1,10 @@
+# 로컬
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'SmartCCTV.settings.local')
+django.setup()
+
+# 서버
+PROJECT_ROOT = '/home/jopago/cctv-back'
+sys.path.insert(0, PROJECT_ROOT)
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'SmartCCTV.settings.production')
+django.setup()
