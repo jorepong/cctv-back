@@ -2,11 +2,8 @@
 import os
 import django
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'SmartCCTV.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'SmartCCTV.settings.local')
 django.setup()
-
-from SmartCCTV.settings import start_ssh_tunnel
-start_ssh_tunnel()
 
 from analytics.models import Cameras
 
