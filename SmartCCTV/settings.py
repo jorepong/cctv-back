@@ -7,7 +7,6 @@ import environ  # django-environ 임포트
 from sshtunnel import SSHTunnelForwarder
 import sys
 import atexit
-import socket
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -29,12 +28,13 @@ if ENV_FILE_PATH.exists():
     environ.Env.read_env(str(ENV_FILE_PATH))
 else:
     print(f"Warning: .env file not found at {ENV_FILE_PATH}. Using environment variables or defaults.")
-
+print("✅ ENV loaded:", ENV_FILE_PATH.exists())
+print("✅ SECRET_KEY:", env('SECRET_KEY', default='❌ Not Found'))
 
 CCTV_STREAMS_CONFIG_PATH = BASE_DIR / 'config' / 'cctv_streams.yaml'
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env('SECRET_KEY')  # .env 또는 환경변수에서 로드 (필수)
+SECRET_KEY = env('SECRET_KEY')# .env 또는 환경변수에서 로드 (필수)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG')
@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'analytics.apps.AnalyticsConfig',
     'dashboard_api.apps.DashboardApiConfig',
     'core.apps.CoreConfig',
+    'django_celery_beat',
 ]
 
 MIDDLEWARE = [
@@ -224,7 +225,9 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-if socket.gethostname() == 'cctv':
-    MEDIA_ROOT = Path("/home/tndusslarj")
-else:
-    MEDIA_ROOT = BASE_DIR
+CAPTURE_ROOT = BASE_DIR / "captured"
+
+# settings.py
+TIME_ZONE = 'Asia/Seoul'
+USE_TZ = True
+
