@@ -1,4 +1,6 @@
 import os
+import sys
+
 import django
 import json
 import subprocess
@@ -8,6 +10,7 @@ from django.utils import timezone
 from django.conf import settings
 from django.utils.timezone import localtime, now as dj_now
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Django 설정 및 초기화
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'SmartCCTV.settings.local')
 django.setup()
@@ -51,7 +54,7 @@ def get_video_resolution(rtsp_url: str) -> str:
     # 실패 시 fallback 해상도
     return "1920x1080"
 
-def capture_snapshot_with_ffmpeg(camera_id: int):
+def capture_snapshot_with_ffmpeg_rtsp(camera_id: int):
     try:
         camera = Cameras.objects.get(pk=camera_id)
     except Cameras.DoesNotExist:
@@ -121,15 +124,72 @@ def capture_snapshot_with_ffmpeg(camera_id: int):
     )
     print(f"[✅] 스냅샷 저장 완료: {image_path}")
 
+def capture_snapshot_with_ffmpeg_hls(camera_id: int):
+    try:
+        camera = Cameras.objects.get(pk=camera_id)
+    except Cameras.DoesNotExist:
+        print(f"[❌] 존재하지 않는 카메라 ID: {camera_id}")
+        return
+
+    timestamp = localtime(dj_now())
+    timestamp_str = "snap_" + timestamp.strftime('%y%m%d%H%M%S')
+
+    cam_dir = Path(settings.CAPTURE_ROOT) / str(camera.camera_id)
+    cam_dir.mkdir(parents=True, exist_ok=True)
+
+    image_path = cam_dir / f"{timestamp_str}.jpg"
+    hls_url = camera.rtsp_url
+
+    print(f"\n[🌐] HLS 이미지 캡처 시작\n→ URL: {hls_url}\n→ 저장: {image_path}")
+
+    result_jpg = subprocess.run([
+        "ffmpeg", "-i", hls_url,
+        "-frames:v", "1", "-q:v", "2", str(image_path)
+    ], capture_output=True, text=True, timeout=30)
+
+    if result_jpg.returncode != 0 or not image_path.exists():
+        print(f"[❌] 이미지 생성 실패: {image_path}")
+        return
+
+    relative_path = image_path.relative_to(settings.CAPTURE_ROOT)
+    Snapshots.objects.create(
+        camera=camera,
+        captured_at=timestamp,
+        image_path=str(relative_path),
+        processing_status_ai='PENDING',
+        processing_status_congestion='PENDING'
+    )
+    print(f"[✅] HLS 스냅샷 저장 완료: {image_path}")
+
+
 # ✅ 무한 반복: 30초마다 1번씩 실행
 if __name__ == "__main__":
-    camera_id = 2  # 분석 대상 카메라 ID
+    try:
+        camera_id = int(input("🎥 캡처할 카메라 ID를 입력하세요: "))
+    except ValueError:
+        print("[❌] 잘못된 입력입니다. 정수를 입력해주세요.")
+        exit(1)
+
+    try:
+        camera = Cameras.objects.get(pk=camera_id)
+    except Cameras.DoesNotExist:
+        print(f"[❌] 존재하지 않는 카메라 ID: {camera_id}")
+        exit(1)
+
+    if camera.source_type == "HLS":
+        print(f"🌐 [ID {camera_id}] HLS 스트림에서 30초 간격 캡처 시작")
+        capture_func = capture_snapshot_with_ffmpeg_hls
+    else:
+        print(f"🎥 [ID {camera_id}] RTSP 스트림에서 30초 간격 캡처 시작")
+        capture_func = capture_snapshot_with_ffmpeg_rtsp
+
     print("📸 30초 간격으로 스냅샷 캡처 시작합니다. 중지하려면 Ctrl+C를 누르세요.")
     while True:
         try:
-            capture_snapshot_with_ffmpeg(camera_id)
+            capture_func(camera_id)
         except Exception as e:
             print(f"[❌] 반복 중 오류 발생: {e}")
         time.sleep(30)
+
 
 

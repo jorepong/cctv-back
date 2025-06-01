@@ -29,7 +29,6 @@ if ENV_FILE_PATH.exists():
 else:
     print(f"Warning: .env file not found at {ENV_FILE_PATH}. Using environment variables or defaults.")
 print("✅ ENV loaded:", ENV_FILE_PATH.exists())
-print("✅ SECRET_KEY:", env('SECRET_KEY', default='❌ Not Found'))
 
 CCTV_STREAMS_CONFIG_PATH = BASE_DIR / 'config' / 'cctv_streams.yaml'
 
