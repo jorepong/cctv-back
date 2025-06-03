@@ -8,8 +8,35 @@ import traceback
 # 로컬 .env 파일 로드 (BASE_DIR의 .env)
 environ.Env.read_env(str(BASE_DIR / '.env'))
 
+ENV_FILE_PATH = BASE_DIR / '.env'
+if ENV_FILE_PATH.exists():
+    environ.Env.read_env(str(ENV_FILE_PATH))
+else:
+    print(f"Warning: .env file not found at {ENV_FILE_PATH}. Using environment variables or defaults.")
+print("✅ ENV loaded:", ENV_FILE_PATH.exists())
+
+CCTV_STREAMS_CONFIG_PATH = BASE_DIR / 'config' / 'cctv_streams.yaml'
+
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = env('SECRET_KEY')# .env 또는 환경변수에서 로드 (필수)
+
 DEBUG = True
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost'])
+
+# Application definition
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'cameras.apps.CamerasConfig',
+    'analytics.apps.AnalyticsConfig',
+    'dashboard_api.apps.DashboardApiConfig',
+    'core.apps.CoreConfig',
+    'django_celery_beat',
+]
 
 # --- SSH 터널 및 데이터베이스 설정 시작 ---
 
@@ -110,3 +137,13 @@ if ssh_tunnel_server and ssh_tunnel_server.is_active:
     atexit.register(stop_ssh_tunnel)
 
 start_ssh_tunnel()
+
+# SmartCCTV/settings.py
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CAPTURE_ROOT = BASE_DIR / "captured"
+
+# settings.py
+TIME_ZONE = 'Asia/Seoul'
+USE_TZ = True
