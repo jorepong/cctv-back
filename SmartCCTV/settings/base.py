@@ -5,6 +5,8 @@ import environ  # django-environ 임포트
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media' # 또는 os.path.join(BASE_DIR, 'media')
 
 # django-environ 초기화
 env = environ.Env(
@@ -34,6 +36,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'cameras.apps.CamerasConfig',
     'analytics.apps.AnalyticsConfig',
     'dashboard_api.apps.DashboardApiConfig',

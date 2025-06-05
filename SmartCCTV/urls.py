@@ -21,5 +21,5 @@ urlpatterns = [
        # path('admin/', admin.site.urls),
        path('api/v1/cameras/', include('cameras.urls')),             # cameras 앱 URL 매핑
        path('api/v1/analytics/', include('analytics.urls')),         # analytics 앱 URL 매핑 (필요시)
-       path('api/v1/', include('dashboard_api.urls')), # dashboard_api 앱 URL 매핑 (예: congestion, statistics, alerts 등)
+       path('api/v1/', include('dashboard_api.urls')), # dashboard_api.urls 포함
 ]

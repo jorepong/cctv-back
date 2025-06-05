@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'cameras.apps.CamerasConfig',
     'analytics.apps.AnalyticsConfig',
     'dashboard_api.apps.DashboardApiConfig',

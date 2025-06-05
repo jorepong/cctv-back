@@ -23,21 +23,6 @@ SECRET_KEY = env('SECRET_KEY')# .env 또는 환경변수에서 로드 (필수)
 DEBUG = True
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost'])
 
-# Application definition
-INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'cameras.apps.CamerasConfig',
-    'analytics.apps.AnalyticsConfig',
-    'dashboard_api.apps.DashboardApiConfig',
-    'core.apps.CoreConfig',
-    'django_celery_beat',
-]
-
 # --- SSH 터널 및 데이터베이스 설정 시작 ---
 
 # SSH 터널 정보
