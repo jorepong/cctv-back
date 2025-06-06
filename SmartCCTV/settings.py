@@ -53,7 +53,6 @@ INSTALLED_APPS = [
     'analytics.apps.AnalyticsConfig',
     'dashboard_api.apps.DashboardApiConfig',
     'core.apps.CoreConfig',
-    'django_celery_beat',
 ]
 
 MIDDLEWARE = [

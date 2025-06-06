@@ -1,3 +1,5 @@
+# analytics/congestion_analysis_tasks.py
+
 import os
 import django
 
@@ -7,7 +9,6 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'SmartCCTV.settings.local')
 django.setup()
 
 from django.utils import timezone
-from celery import shared_task
 from django.db import transaction
 
 # 프로젝트의 analytics 앱에서 필요한 모델들을 가져옵니다.
@@ -241,11 +242,6 @@ def update_roi_for_camera_service(camera_id: int, new_footprints: List[Tuple[flo
     return True # 성공적으로 업데이트 또는 생성됨
 
 
-# --- Celery Periodic Task ---
-# @shared_task 데코레이터는 이 함수를 Celery 작업으로 등록합니다.
-# name="update_all_camera_rois_periodic" 은 Celery에서 이 작업을 식별하는 이름입니다.
-# 이 작업은 Celery Beat와 같은 스케줄러에 의해 주기적으로 실행될 수 있습니다 (예: 매 시간).
-@shared_task(name="update_all_camera_rois_periodic")
 def update_all_camera_rois_periodic_task():
     """
     모든 활성 모니터링 대상 카메라에 대해 주기적으로 동적 ROI를 업데이트하는 Celery 작업입니다.
@@ -257,7 +253,6 @@ def update_all_camera_rois_periodic_task():
     # 더 정확한 방법은 이 작업의 마지막 성공적 실행 시간을 기록하고,
     # 그 시간부터 현재까지의 데이터를 가져오는 것입니다. (여기서는 단순화된 방식 사용)
     start_time_for_footprints = timezone.now() - timezone.timedelta(hours=1)
-
     print(f"[ROI 주기적 작업] {start_time_for_footprints} 이후 데이터에 대한 주기적 ROI 업데이트 시작...")
 
     # is_active_monitoring=True 인 카메라들만 대상으로 ROI를 업데이트합니다.

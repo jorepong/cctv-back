@@ -79,10 +79,9 @@
 #     )
 #     print(f"[✅] 스냅샷 저장 완료: {image_path}")
 
+# analytics/tasks.py
 from analytics.services import calculate_and_save_congestion_event
 
-
-@shared_task(name="calculate_congestion_for_snapshot")
 def calculate_congestion_for_snapshot_task(snapshot_id: int):
     """
     주어진 스냅샷에 대한 혼잡도를 계산하고 결과를 저장하는 Celery 작업입니다.
@@ -99,14 +98,7 @@ def calculate_congestion_for_snapshot_task(snapshot_id: int):
 
         if result_event:
             print(f"[Congestion Task] Snapshot ID {snapshot_id}의 혼잡도 분석 성공. Event ID: {result_event.event_id}, Level: {result_event.congestion_level}")
-        # else:
-            # calculate_and_save_congestion_event 내부에서 이미 로그를 남기므로 여기서는 추가 로그 불필요할 수 있음
-            # print(f"[Congestion Task] Snapshot ID {snapshot_id}의 혼잡도 분석 중 문제 발생 또는 저장 조건 미충족.")
 
     except Exception as e:
-        # 예상치 못한 오류 발생 시 로깅 및 처리
         print(f"[Congestion Task] Snapshot ID {snapshot_id} 처리 중 심각한 오류 발생: {e}")
-        # 여기에 에러 리포팅 시스템 연동 또는 실패 상태 업데이트 등의 로직 추가 가능
-        # 예: Snapshots.objects.filter(snapshot_id=snapshot_id).update(processing_status_congestion=ProcessingStatus.FAILED)
-        # self.retry(exc=e, countdown=60) # 특정 예외에 대해 재시도 로직 (필요시)
-        raise # 오류를 다시 발생시켜 Celery가 실패로 인지하도록 함 (또는 특정 방식으로 처리)
+        raise

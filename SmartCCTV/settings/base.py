@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'django_q',
     'cameras.apps.CamerasConfig',
     'analytics.apps.AnalyticsConfig',
     'dashboard_api.apps.DashboardApiConfig',
@@ -119,3 +120,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # settings.py
 TIME_ZONE = 'Asia/Seoul'
 USE_TZ = True
+
+Q_CLUSTER = {
+    'name': 'SmartCCTV_Scheduler',
+    'workers': 1,  # 주기적인 ROI 업데이트 작업 하나만이라면 1개로도 충분할 수 있습니다. 필요시 조정.
+    'timeout': 90,  # 작업 타임아웃 (초). ROI 작업이 오래 걸린다면 늘려주세요.
+    'retry': 120,   # 실패한 작업 재시도 대기 시간 (초)
+    'queue_limit': 50, # 큐에 쌓일 수 있는 최대 작업 수
+    'bulk': 10,
+    'orm': 'default',  # Django의 'default' 데이터베이스를 브로커로 사용
+    'scheduler': True  # 내장 스케줄러 사용 설정 (주기적 작업에 필수)
+}
