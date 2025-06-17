@@ -131,3 +131,20 @@ Q_CLUSTER = {
     'orm': 'default',  # Django의 'default' 데이터베이스를 브로커로 사용
     'scheduler': True  # 내장 스케줄러 사용 설정 (주기적 작업에 필수)
 }
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'django_q': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+    },
+}

@@ -3,6 +3,8 @@
 import os
 from django.utils import timezone
 from django.db import transaction
+from django_q.tasks import async_task
+
 from .models import (
     Snapshots,
     DetectedObjects,
@@ -195,41 +197,59 @@ def calculate_and_save_congestion_event(snapshot_id: int) -> Optional[Congestion
         f"[Congestion Service] Snapshot ID {snapshot_id}의 혼잡도 분석 완료. Event ID: {congestion_event.event_id}, Level: {congestion_level}")
     return congestion_event
 
-# (선택적) 과거 데이터 비교 함수 예시 (2학기 고도화 내용)
-# def get_historical_average_for_comparison(camera: Cameras, current_timestamp: timezone.datetime) -> Optional[int]:
-#     # 예: 지난 주 같은 요일, 같은 시간대의 평균 인원 수 조회 로직
-#     # 이 부분은 실제 데이터와 요구사항에 따라 복잡하게 구현될 수 있습니다.
-#     return None
+
+def log_with_time(message):
+    """현재 시간과 함께 로그 메시지를 출력합니다."""
+    # 이 함수는 필요에 따라 별도의 유틸리티 모듈로 분리하여 사용할 수도 있습니다.
+    from django.utils.timezone import localtime, now
+    print(f"[{localtime(now()).strftime('%H:%M:%S.%f')[:-3]}] {message}")
+
 
 def analyze_snapshot_task(snapshot_id):
+    """
+    주어진 스냅샷에 대해 AI 객체 탐지를 수행하고,
+    결과를 DB에 저장하며, 처리된 이미지를 생성하는 비동기 작업입니다.
+    """
+    snapshot = None  # 예외 발생 시 참조를 위해 미리 선언
     try:
+        log_with_time(f"🧠 AI 분석 시작 (Snapshot ID: {snapshot_id})")
         snapshot = Snapshots.objects.get(pk=snapshot_id)
-        snapshot.processing_status_ai = "PROCESSING"
-        snapshot.save()
 
-        # 원본 이미지 경로
+        # 상태를 'PROCESSING'으로 즉시 업데이트
+        snapshot.processing_status_ai = "PROCESSING"
+        snapshot.save(update_fields=['processing_status_ai'])
+
+        # 원본 이미지 경로 확인
         image_path = snapshot.image_path
         if not os.path.isabs(image_path):
             image_path = os.path.join(settings.MEDIA_ROOT, image_path)
 
+        log_with_time(f"-> 객체 탐지 실행: {os.path.basename(image_path)}")
+
         # 1. 객체 탐지
         detections = detect_objects(image_path)
+        num_detections = len(detections)
+        log_with_time(f"-> {num_detections}개 객체 탐지 완료.")
 
-        # 2. DetectedObjects 테이블에 객체 하나씩 저장
-        for det in detections:
-            DetectedObjects.objects.create(
-                snapshot=snapshot,
-                class_label=det["label"],
-                confidence=det["confidence"],
-                bbox_x=det["bbox_x"],
-                bbox_y=det["bbox_y"],
-                bbox_width=det["bbox_width"],
-                bbox_height=det["bbox_height"],
-                center_x=det["center_x"],
-                center_y=det["center_y"]
-            )
+        # 2. DetectedObjects 테이블에 객체 정보 저장
+        if num_detections > 0:
+            log_with_time("-> 탐지된 객체 정보 DB 저장 시작...")
+            for det in detections:
+                DetectedObjects.objects.create(
+                    snapshot=snapshot,
+                    class_label=det["label"],
+                    confidence=det["confidence"],
+                    bbox_x=det["bbox_x"],
+                    bbox_y=det["bbox_y"],
+                    bbox_width=det["bbox_width"],
+                    bbox_height=det["bbox_height"],
+                    center_x=det["center_x"],
+                    center_y=det["center_y"]
+                )
+            log_with_time("-> 객체 정보 저장 완료.")
 
-        # 3. 바운딩 박스 그리기 및 이미지 저장
+        # 3. 바운딩 박스 그리기 및 처리된 이미지 저장
+        log_with_time("-> 처리된 이미지 생성 및 저장 시작...")
         image = Image.open(image_path).convert("RGB")
         draw = ImageDraw.Draw(image)
 
@@ -238,28 +258,43 @@ def analyze_snapshot_task(snapshot_id):
             w, h = det["bbox_width"], det["bbox_height"]
             label = f"{det['label']} ({det['confidence']:.2f})"
             draw.rectangle([x, y, x + w, y + h], outline="red", width=2)
+            # 텍스트 배경을 추가하여 가독성 향상 (선택 사항)
+            text_bbox = draw.textbbox((x, y - 10), label)
+            draw.rectangle(text_bbox, fill="red")
             draw.text((x, y - 10), label, fill="yellow")
 
         # 저장 경로 설정
-        output_dir = os.path.join(settings.MEDIA_ROOT, "processed_snapshots", f"camera{snapshot.camera.camera_id}")
+        output_dir = os.path.join(settings.MEDIA_ROOT, "processed_snapshots", f"camera_{snapshot.camera.camera_id}")
         os.makedirs(output_dir, exist_ok=True)
-        output_filename = f"snap{snapshot.snapshot_id}_bbox.jpg"
+        output_filename = f"snap_{snapshot.snapshot_id}_bbox.jpg"
         output_path = os.path.join(output_dir, output_filename)
 
         image.save(output_path)
+        log_with_time(f"-> 처리된 이미지 저장 완료: {output_filename}")
 
-        # 4. Snapshots 테이블 업데이트 (객체는 DetectedObjects에 저장함!)
+        # 4. Snapshots 테이블 최종 업데이트
         snapshot.processed_image_path = os.path.relpath(output_path, settings.MEDIA_ROOT)
         snapshot.processing_status_ai = "COMPLETED"
         snapshot.analyzed_at_ai = timezone.now()
         snapshot.save()
 
+        log_with_time(f"✅ AI 분석 완료 (Snapshot ID: {snapshot.snapshot_id})")
+
+        # 5. 다음 단계인 밀집도 분석 작업 호출 (Task Chaining)
+        async_task(
+            'analytics.tasks.calculate_congestion_for_snapshot_task',
+            snapshot.snapshot_id,
+            q_options={'group': f'congestion-analysis-{snapshot.camera.camera_id}'}
+        )
+        log_with_time(f"-> [🚀] 밀집도 분석 작업 (Snapshot ID: {snapshot.snapshot_id})을 큐에 등록했습니다.")
+
         return {
             "snapshot_id": snapshot.snapshot_id,
-            "num_detected_objects": len(detections)
+            "num_detected_objects": num_detections
         }
 
     except Exception as e:
+        log_with_time(f"❌ AI 분석 실패 (Snapshot ID: {snapshot_id}): {e}")
         if snapshot:
             snapshot.processing_status_ai = "FAILED"
             snapshot.save()

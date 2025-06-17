@@ -13,8 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # django-environ 초기화
 env = environ.Env(
-    # (타입, 기본값)
-    DEBUG=(bool, False),  # DEBUG 기본값은 False (프로덕션 환경 고려)
+    DEBUG=(bool, False),
     SSH_PORT=(int, 22),
     MYSQL_PORT_ON_DEBIAN=(int, 3306),
     LOCAL_BIND_PORT=(int, 3309),

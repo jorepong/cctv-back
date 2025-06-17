@@ -1,7 +1,6 @@
-# analytics/capture.py
-
 import os
 import django
+from django_q.tasks import async_task
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'SmartCCTV.settings.local')
 django.setup()
@@ -33,7 +32,12 @@ def capture_snapshot_direct_ffmpeg(camera_id: int) -> bool:
     timestamp = localtime(dj_now())
     timestamp_str = "snap_" + timestamp.strftime('%y%m%d%H%M%S')
 
-    cam_dir = Path.cwd() / "captured" / str(camera.camera_id)
+    # --- [수정된 부분 1] ---
+    # Path.cwd() 대신 __file__을 사용하여 현재 파일의 위치를 기준으로 경로를 설정합니다.
+    # 이렇게 하면 어디서 실행되든 항상 'analytics/captured/' 폴더에 저장됩니다.
+    script_dir = Path(__file__).resolve().parent
+    cam_dir = script_dir / "captured" / str(camera.camera_id)
+    # --- [수정 끝] ---
     cam_dir.mkdir(parents=True, exist_ok=True)
 
     image_path = cam_dir / f"{timestamp_str}.jpg"
@@ -75,7 +79,7 @@ def capture_snapshot_direct_ffmpeg(camera_id: int) -> bool:
             return False
 
         # 데이터베이스에 저장
-        Snapshots.objects.create(
+        snapshot = Snapshots.objects.create(
             camera=camera,
             captured_at=timestamp,
             image_path=str(image_path),
@@ -84,6 +88,13 @@ def capture_snapshot_direct_ffmpeg(camera_id: int) -> bool:
         )
 
         log_with_time(f"✅ 스냅샷 저장 완료: {image_path.name} ({file_size:,} bytes)")
+
+        async_task(
+            'analytics.services.analyze_snapshot_task',
+            snapshot.snapshot_id,
+            q_options={'group': f'snapshot-analysis-{camera_id}'}
+        )
+
         return True
 
     except subprocess.TimeoutExpired:
@@ -111,7 +122,11 @@ def capture_snapshot_hls_direct(camera_id: int) -> bool:
     timestamp = localtime(dj_now())
     timestamp_str = "snap_" + timestamp.strftime('%y%m%d%H%M%S')
 
-    cam_dir = Path.cwd() / "captured" / str(camera.camera_id)
+    # --- [수정된 부분 2] ---
+    # Path.cwd() 대신 __file__을 사용하여 현재 파일의 위치를 기준으로 경로를 설정합니다.
+    script_dir = Path(__file__).resolve().parent
+    cam_dir = script_dir / "captured" / str(camera.camera_id)
+    # --- [수정 끝] ---
     cam_dir.mkdir(parents=True, exist_ok=True)
 
     image_path = cam_dir / f"{timestamp_str}.jpg"
@@ -148,7 +163,7 @@ def capture_snapshot_hls_direct(camera_id: int) -> bool:
             image_path.unlink()
             return False
 
-        Snapshots.objects.create(
+        snapshot = Snapshots.objects.create(
             camera=camera,
             captured_at=timestamp,
             image_path=str(image_path),
@@ -157,6 +172,13 @@ def capture_snapshot_hls_direct(camera_id: int) -> bool:
         )
 
         log_with_time(f"✅ HLS 스냅샷 저장 완료: {image_path.name} ({file_size:,} bytes)")
+
+        async_task(
+            'analytics.services.analyze_snapshot_task',
+            snapshot.snapshot_id,
+            q_options={'group': f'snapshot-analysis-{camera_id}'}
+        )
+
         return True
 
     except subprocess.TimeoutExpired:
