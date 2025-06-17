@@ -1,3 +1,5 @@
+# analytics/apps.py
+
 from django.apps import AppConfig
 
 
@@ -11,23 +13,32 @@ class AnalyticsConfig(AppConfig):
         from django_q.tasks import schedule
         from django_q.models import Schedule
 
-        # 스케줄링할 함수의 전체 Python 경로
+        # 기존 ROI 업데이트 스케줄링
         func_path = 'analytics.congestion_analysis_tasks.update_all_camera_rois_periodic_task'
-
-        # 스케줄 이름 (중복 등록 방지를 위해 사용)
         schedule_name = 'Hourly ROI Update via Django-Q'
-
-        # 매 시간 정각에 실행하는 CRON 스케줄
-        # 테스트를 위해 매 분 실행하려면 '*/1 * * * *' 로 변경
         cron_schedule = '0 */1 * * *'
 
-        # 이미 같은 이름의 스케줄이 등록되어 있는지 확인하여 중복 등록을 방지합니다.
         if not Schedule.objects.filter(name=schedule_name).exists():
             schedule(
                 func_path,
                 name=schedule_name,
                 schedule_type=Schedule.CRON,
                 cron=cron_schedule,
-                repeats=-1,  # 무한 반복
+                repeats=-1, # 무한 반복
             )
             print(f"'{schedule_name}' 작업이 django-q 스케줄러에 등록되었습니다.")
+
+        # 새로운 카메라 캡처 스케줄링 (30초마다 모든 활성 카메라 캡처)
+        capture_func_path = 'analytics.capture.capture_all_active_cameras_task'
+        capture_schedule_name = 'Camera Capture Every 30 Seconds'
+        capture_cron_schedule = '*/1 * * * *'  # 매 분마다 실행 (30초 간격을 위해 함수 내에서 처리)
+
+        if not Schedule.objects.filter(name=capture_schedule_name).exists():
+            schedule(
+                capture_func_path,
+                name=capture_schedule_name,
+                schedule_type=Schedule.CRON,
+                cron=capture_cron_schedule,
+                repeats=-1, # 무한 반복
+            )
+            print(f"'{capture_schedule_name}' 작업이 django-q 스케줄러에 등록되었습니다.")

@@ -13,7 +13,7 @@ env = environ.Env(
     DEBUG=(bool, False),
     SSH_PORT=(int, 22),
     MYSQL_PORT_ON_DEBIAN=(int, 3306),
-    LOCAL_BIND_PORT=(int, 3309),
+    LOCAL_BIND_PORT=(int, 3307),
 )
 
 env = environ.Env()

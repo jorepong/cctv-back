@@ -1,7 +1,6 @@
 # analytics/services.py
 
 import os
-from celery import shared_task
 from django.utils import timezone
 from django.db import transaction
 from .models import (
@@ -202,7 +201,6 @@ def calculate_and_save_congestion_event(snapshot_id: int) -> Optional[Congestion
 #     # 이 부분은 실제 데이터와 요구사항에 따라 복잡하게 구현될 수 있습니다.
 #     return None
 
-@shared_task
 def analyze_snapshot_task(snapshot_id):
     try:
         snapshot = Snapshots.objects.get(pk=snapshot_id)

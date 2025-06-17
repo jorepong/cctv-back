@@ -1,3 +1,5 @@
+# dashboard_api/serializers.py
+
 from datetime import timezone
 
 from rest_framework import serializers

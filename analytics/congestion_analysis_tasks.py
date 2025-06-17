@@ -7,6 +7,7 @@ import django
 # 스크립트가 Django ORM 및 설정을 사용할 수 있도록 환경을 설정합니다.
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'SmartCCTV.settings.local')
 django.setup()
+print(__file__)
 
 from django.utils import timezone
 from django.db import transaction

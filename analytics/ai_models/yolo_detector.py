@@ -1,3 +1,4 @@
+# analytics/ai_models/yolo_detector.py
 import torch
 from PIL import Image
 import numpy as np

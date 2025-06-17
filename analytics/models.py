@@ -5,7 +5,7 @@ from django.utils import timezone # now() 대신 Django의 timezone.now 또는 a
 # cameras 앱의 Cameras 모델을 임포트합니다.
 # 실제 프로젝트 구조에 따라 'project_name.cameras.models' 또는 'cameras.models'가 될 수 있습니다.
 # 보통은 'app_name.models' 형태로 임포트합니다.
-from cameras.models import Cameras
+from cameras.models import Cameras, CameraStatus, CameraSourceType
 
 # Enum-like choices for analytics models
 class ProcessingStatus(models.TextChoices):
