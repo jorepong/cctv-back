@@ -24,6 +24,8 @@ class ROIDefinitionType(models.TextChoices):
     MANUAL_POLYGON = 'MANUAL_POLYGON', '수동 폴리곤'
     DYNAMIC_CONVEX_HULL = 'DYNAMIC_CONVEX_HULL', '동적 컨벡스 헐'
     MOTION_PATTERN_BASED = 'MOTION_PATTERN_BASED', '움직임 패턴 기반'
+    DYNAMIC_ALPHA_SHAPE = 'DYNAMIC_ALPHA_SHAPE', '동적 알파 셰이프'
+    DYNAMIC_ALPHA_SHAPE_SLIDING = 'DYNAMIC_ALPHA_SHAPE_SLIDING', '동적 알파 셰이프 (슬라이딩 윈도우)'
 
 
 class Snapshots(models.Model):

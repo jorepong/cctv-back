@@ -229,3 +229,22 @@ CAPTURE_ROOT = BASE_DIR / "captured"
 TIME_ZONE = 'Asia/Seoul'
 USE_TZ = True
 
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+        'null': {
+            'class': 'logging.NullHandler',
+        },
+    },
+    'loggers': {
+        'django_q': {
+            'handlers': ['null'],  # NullHandler 사용
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}

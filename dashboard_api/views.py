@@ -1,10 +1,12 @@
 # dashboard_api/views.py
+import os
 from datetime import timedelta, datetime
 
+from django.conf import settings
 from django.db.models import Avg, Max
 from django.db.models.functions import TruncDate, ExtractWeekDay, \
     ExtractHour
-from django.http import Http404
+from django.http import Http404, FileResponse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.generics import ListAPIView, RetrieveAPIView, UpdateAPIView
@@ -77,28 +79,23 @@ class CameraStreamURLView(APIView):
     def get(self, request, camera_id, format=None):
         camera = self.get_object(camera_id)
 
-        # --- 스트리밍 URL 생성 로직 (이수연 팀원 담당 부분 연동) ---
-        # 이 부분은 실제 스트리밍 서버, RTSP to HLS/DASH 변환 로직과 연동되어야 합니다.
-        # 예시: HLS를 사용하고, 카메라 ID 기반으로 URL을 동적으로 생성한다고 가정
-        # 실제 구현 시, camera.rtsp_url, camera.source_type 등을 활용하여
-        # 스트림 변환 서비스 호출 또는 URL 생성 규칙 적용
+        # --- 스트리밍 URL 생성 로직 (요청에 따라 수정된 부분) ---
 
-        # 임시 하드코딩된 예시 URL (실제 환경에서는 동적으로 생성 또는 조회 필요)
-        # 실제로는 camera 객체의 정보를 바탕으로 스트리밍 서버에 요청하거나,
-        # 정해진 규칙에 따라 URL을 구성해야 합니다.
-        # 예를 들어, 이수연 팀원이 개발한 함수를 호출할 수 있습니다.
-        # streaming_info = get_hls_stream_url_for_camera(camera.camera_id, camera.rtsp_url)
+        stream_url = ""
+        stream_type = ""
 
-        # 아래는 예시 응답 데이터입니다. 실제 로직으로 대체해야 합니다.
-        if camera.status == Cameras.CameraStatus.ACTIVE:  # 예: 활성 상태인 카메라만 스트리밍 제공
-            # 실제 스트리밍 URL 생성/조회 로직 필요
-            # stream_url = f"https://streaming.example.com/live/{camera.camera_id}/playlist.m3u8"
-            # stream_type = "HLS"
-
-            # API 명세에 따른 더미 데이터 (실제 값으로 대체 필요)
+        # 카메라 ID가 1일 경우, 지정된 URL로 하드코딩
+        if camera.camera_id == 1:
+            stream_url = 'http://34.22.83.144/stream1.m3u8'
+            stream_type = 'HLS'  # .m3u8은 HLS 프로토콜입니다.
+        else:
+            # 다른 카메라 ID의 경우, 기존 예시 또는 다른 로직을 따름
+            # (이수연 팀원 담당 부분 연동)
+            # 여기서는 기존의 더미 URL 생성 규칙을 유지합니다.
             stream_url = f"https://your-streaming-server.com/live/{camera.camera_id}/playlist.m3u8"
             stream_type = "HLS"
 
+        if camera.status == Cameras.CameraStatus.ACTIVE:
             data = {
                 "camera_id": camera.camera_id,
                 "name": camera.name,
@@ -108,14 +105,13 @@ class CameraStreamURLView(APIView):
             serializer = CameraStreamURLSerializer(data=data)
             if serializer.is_valid():
                 return Response(serializer.data, status=status.HTTP_200_OK)
-            else:  # 보통 이 경우는 서버측 로직 오류
+            else:
                 return Response(serializer.errors, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         else:
             return Response({
-                "error_code": "NOT_FOUND",  # 또는 SERVICE_UNAVAILABLE
+                "error_code": "NOT_FOUND",
                 "message": f"카메라 ID {camera_id}의 스트리밍을 사용할 수 없거나 준비되지 않았습니다 (상태: {camera.status})."
-            }, status=status.HTTP_404_NOT_FOUND)  # 또는 503
-
+            }, status=status.HTTP_404_NOT_FOUND)
 
 class LatestCongestionView(APIView):
     """
@@ -348,19 +344,18 @@ class CongestionStatisticsView(APIView):
                 return Response({"error_code": "INVALID_PARAMETER", "message": "잘못된 start_date 형식입니다."},
                                 status=status.HTTP_400_BAD_REQUEST)
         else:
-            # start_date 또는 end_date 중 하나라도 입력되지 않으면 지난 1주일
-            if not end_date_str:  # 둘 다 입력 안 된 경우, end_date도 재설정
+            if not end_date_str:
                 end_date = timezone.now().replace(hour=23, minute=59, second=59, microsecond=999999)
             start_date = (end_date - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
 
-        group_by = request.query_params.get('group_by', 'date')  # 기본값 'date'
+        group_by = request.query_params.get('group_by', 'date')
 
         queryset = CongestionEvents.objects.filter(
             event_timestamp__gte=start_date,
             event_timestamp__lte=end_date
         ).select_related('camera')
 
-        camera_name = "전체 시스템"  # camera_id="all"일 경우
+        camera_name = "전체 시스템"
         target_camera_id_int = None
 
         if camera_id_param.lower() != 'all':
@@ -376,48 +371,29 @@ class CongestionStatisticsView(APIView):
                 return Response({"error_code": "INVALID_PARAMETER", "message": "잘못된 camera_id 형식입니다."},
                                 status=status.HTTP_400_BAD_REQUEST)
 
-        # --- 집계 로직 시작 ---
-        # API 명세의 응답 예시('statistics' 필드)는 avg_person_count, peak_congestion_level, avg_congestion_value_raw 포함
-        # peak_congestion_level은 정의가 모호하여 구현이 복잡할 수 있음 (예: 가장 빈번했던 최고 수준 or 최고 인원수일 때의 수준)
-        # 여기서는 avg_person_count, avg_congestion_value_raw, max_person_count를 중심으로 구현
-
         aggregation_fields = {
             'avg_person_count': Avg('person_count'),
             'avg_congestion_value_raw': Avg('congestion_value_raw'),
-            'max_person_count': Max('person_count'),  # peak_congestion_level 대신 max_person_count로 대체 또는 추가 정보 활용
+            'max_person_count': Max('person_count'),
         }
 
-        # CongestionLevelLabel 순서 (VERY_HIGH가 가장 높음)
-        level_order = [CongestionLevelLabel.VERY_HIGH, CongestionLevelLabel.HIGH, CongestionLevelLabel.MEDIUM,
-                       CongestionLevelLabel.LOW]
-        # peak_congestion_level을 위해 각 그룹 내에서 가장 높은 빈도의 congestion_level 또는 특정 규칙에 따른 레벨 결정 필요.
-        # 단순화를 위해 여기서는 max_person_count 시점의 congestion_level을 가져오거나, 그룹 내 최빈값 등을 고려해야 함.
-        # 이 부분은 프로젝트의 정확한 요구사항에 따라 구현 방식이 달라질 수 있음.
-        # 여기서는 peak_congestion_level을 제외하고 진행하거나, max_person_count로 대체 표현.
-        # 만약 peak_congestion_level을 구현한다면 Subquery나 Window function 등을 고려해야 할 수 있음.
-
         statistics_data = []
-        annotation_key = ''
 
         if group_by == 'date':
-            annotation_key = 'date_group'
             queryset = queryset.annotate(date_group=TruncDate('event_timestamp')) \
                 .values('date_group') \
                 .annotate(**aggregation_fields) \
                 .order_by('date_group')
             statistics_data = [
                 {
-                    "date": item['date_group'].isoformat(),
-                    "avg_person_count": round(item['avg_person_count'], 1) if item['avg_person_count'] else 0,
-                    "avg_congestion_value_raw": round(item['avg_congestion_value_raw'], 3) if item[
-                        'avg_congestion_value_raw'] else 0,
-                    # "peak_congestion_level": "TODO", # 별도 로직 필요
+                    # [수정됨] item['date_group']이 None인 경우를 대비하여 방어 코드 추가
+                    "date": item['date_group'].isoformat() if item['date_group'] else None,
+                    "avg_person_count": round(item['avg_person_count'], 1) if item.get('avg_person_count') else 0,
+                    "avg_congestion_value_raw": round(item['avg_congestion_value_raw'], 3) if item.get(
+                        'avg_congestion_value_raw') else 0,
                 } for item in queryset
             ]
-        elif group_by == 'hour_of_day':  # 0-23시
-            annotation_key = 'hour_group'
-            # TruncHour는 날짜까지 포함하므로, ExtractHour 사용 또는 추가 처리 필요
-            # 여기서는 시간대별 평균이므로, event_timestamp의 hour 부분만 사용
+        elif group_by == 'hour_of_day':
             queryset = queryset.annotate(hour_group=ExtractHour('event_timestamp')) \
                 .values('hour_group') \
                 .annotate(**aggregation_fields) \
@@ -425,46 +401,32 @@ class CongestionStatisticsView(APIView):
             statistics_data = [
                 {
                     "hour": item['hour_group'],
-                    "avg_person_count": round(item['avg_person_count'], 1) if item['avg_person_count'] else 0,
-                    "avg_congestion_value_raw": round(item['avg_congestion_value_raw'], 3) if item[
-                        'avg_congestion_value_raw'] else 0,
-                    # "peak_congestion_level": "TODO",
-                } for item in queryset
+                    "avg_person_count": round(item['avg_person_count'], 1) if item.get('avg_person_count') else 0,
+                    "avg_congestion_value_raw": round(item['avg_congestion_value_raw'], 3) if item.get(
+                        'avg_congestion_value_raw') else 0,
+                } for item in queryset if item['hour_group'] is not None  # 혹시 모를 None 값 방어
             ]
-        elif group_by == 'day_of_week':  # 1(일요일)-7(토요일) 또는 1(월요일)-7(일요일) (DB, Django 설정에 따라 다름)
-            # Django의 ExtractWeekDay: 1 (일요일) to 7 (토요일)
-            annotation_key = 'weekday_group'
+        elif group_by == 'day_of_week':
             queryset = queryset.annotate(weekday_group=ExtractWeekDay('event_timestamp')) \
                 .values('weekday_group') \
                 .annotate(**aggregation_fields) \
                 .order_by('weekday_group')
-            # API 명세는 "Monday...Sunday 또는 숫자 1(월요일)...7(일요일)" 언급. 숫자 1=월요일로 가정하고 변환 필요.
-            # (d % 7) + 1 로 하면 1(월) ~ 7(일) (단, d가 1=일요일일때 (1%7)+1 = 2가 되어버림. )
-            # weekday_map = {1: 'Sunday', 2: 'Monday', ..., 7: 'Saturday'} 또는 숫자 그대로 사용
             statistics_data = [
                 {
-                    "day_of_week": item['weekday_group'],  # 필요시 문자열(Monday 등) 또는 1(월)~7(일)로 변환
-                    "avg_person_count": round(item['avg_person_count'], 1) if item['avg_person_count'] else 0,
-                    "avg_congestion_value_raw": round(item['avg_congestion_value_raw'], 3) if item[
-                        'avg_congestion_value_raw'] else 0,
-                } for item in queryset
+                    "day_of_week": item['weekday_group'],
+                    "avg_person_count": round(item['avg_person_count'], 1) if item.get('avg_person_count') else 0,
+                    "avg_congestion_value_raw": round(item.get('avg_congestion_value_raw'), 3) if item.get(
+                        'avg_congestion_value_raw') else 0,
+                } for item in queryset if item['weekday_group'] is not None  # 혹시 모를 None 값 방어
             ]
-        # 'week', 'month'에 대한 group_by 로직도 유사하게 TruncWeek, TruncMonth 사용 가능
-
-        else:  # 지원하지 않는 group_by 값
+        else:
             return Response({
                 "error_code": "INVALID_PARAMETER",
                 "message": f"지원하지 않는 group_by 값입니다: {group_by}. (사용 가능: date, hour_of_day, day_of_week 등)"
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # --- 비교 데이터 (comparison_data) ---
-        # 이 부분은 API 명세에 따라 상당히 복잡한 로직이 될 수 있습니다.
-        # 예: "지난주 동시간대", "이전 7일간의 동일 요일별 평균" 등
-        # 1학기 범위에서는 이 부분은 생략하거나 매우 단순화된 형태로 제공할 수 있습니다.
-        # 여기서는 우선 빈 객체로 응답합니다.
         comparison_data = {
             "reference_period_info": "Comparison data not yet implemented.",
-            # "last_week_statistics": [] # 또는 previous_week_daily_average_statistics
         }
 
         return Response({
@@ -473,9 +435,8 @@ class CongestionStatisticsView(APIView):
             "date_range_processed": f"{start_date.isoformat()}/{end_date.isoformat()}",
             "group_by": group_by,
             "statistics": statistics_data,
-            "comparison_data": comparison_data  # 우선 빈 데이터 또는 미구현 메시지
+            "comparison_data": comparison_data
         }, status=status.HTTP_200_OK)
-
 
 class ProcessedSnapshotImageView(APIView):
     """
@@ -639,3 +600,30 @@ class AlertAcknowledgeView(UpdateAPIView):
     #             "acknowledged_at": alert_event.acknowledged_at.isoformat() if alert_event.acknowledged_at else None
     #         }
     #         return Response(response_data, status=status.HTTP_200_OK)
+
+def serve_analytics_image(request, filepath):
+    """
+    'analytics' 앱 폴더 내에 있는 이미지 파일을 서빙하는 뷰.
+    URL로부터 받은 filepath를 기반으로 실제 파일 경로를 찾아서 반환합니다.
+    """
+    # 1. 기준이 되는 절대 경로를 설정합니다.
+    # settings.BASE_DIR은 보통 manage.py가 있는 프로젝트 루트를 가리킵니다.
+    base_dir = os.path.join(settings.BASE_DIR, 'analytics')
+
+    # 2. URL로 받은 filepath와 기준 경로를 조합하여 실제 파일 경로를 만듭니다.
+    # 예: filepath = "processed_snapshots/camera_2/snap1969_bbox.jpg"
+    requested_path = os.path.join(base_dir, filepath)
+
+    # 3. **(보안 강화)** Directory Traversal 공격을 방지하기 위해 경로를 검증합니다.
+    # 생성된 경로가 반드시 base_dir 하위에 있는지 확인합니다.
+    if not os.path.abspath(requested_path).startswith(os.path.abspath(base_dir)):
+        raise Http404("Permission Denied")
+
+    # 4. 파일이 실제로 존재하는지 확인합니다.
+    if os.path.exists(requested_path):
+        # 5. FileResponse를 사용하여 파일을 브라우저에 전송합니다.
+        # FileResponse는 이미지 종류에 맞는 Content-Type 헤더를 자동으로 설정해줍니다.
+        return FileResponse(open(requested_path, 'rb'))
+    else:
+        # 파일이 없으면 404 에러를 발생시킵니다.
+        raise Http404("File not found")

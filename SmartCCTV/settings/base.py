@@ -102,10 +102,10 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
+LANGUAGE_CODE = 'ko-kr'
+TIME_ZONE = 'Asia/Seoul'  # 한국 표준시
 USE_I18N = True
-USE_TZ = True
+USE_TZ = False             # 타임존 사용 비활성화 (UTC 저장 안 함)
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
@@ -129,7 +129,9 @@ Q_CLUSTER = {
     'queue_limit': 50, # 큐에 쌓일 수 있는 최대 작업 수
     'bulk': 10,
     'orm': 'default',  # Django의 'default' 데이터베이스를 브로커로 사용
-    'scheduler': True  # 내장 스케줄러 사용 설정 (주기적 작업에 필수)
+    'scheduler': True,  # 내장 스케줄러 사용 설정 (주기적 작업에 필수)
+    'verbose': False,  # 상세 로그 비활성화
+    'log_level': 'ERROR',
 }
 
 LOGGING = {
@@ -139,11 +141,14 @@ LOGGING = {
         'console': {
             'class': 'logging.StreamHandler',
         },
+        'null': {
+            'class': 'logging.NullHandler',
+        },
     },
     'loggers': {
         'django_q': {
-            'handlers': ['console'],
-            'level': 'WARNING',
+            'handlers': ['null'],  # NullHandler 사용
+            'level': 'DEBUG',
             'propagate': False,
         },
     },

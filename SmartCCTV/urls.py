@@ -14,12 +14,16 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
+
+from dashboard_api.views import serve_analytics_image
 
 urlpatterns = [
        path('admin/', admin.site.urls),
        path('api/v1/cameras/', include('cameras.urls')),             # cameras 앱 URL 매핑
        path('api/v1/analytics/', include('analytics.urls')),         # analytics 앱 URL 매핑 (필요시)
        path('api/v1/', include('dashboard_api.urls')), # dashboard_api.urls 포함
+       path('analytics/<path:filepath>', serve_analytics_image, name='serve_analytics_image'),
 ]

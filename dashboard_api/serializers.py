@@ -63,26 +63,59 @@ class ProcessedSnapshotImageSerializer(serializers.ModelSerializer):
         model = Snapshots
         fields = [
             'snapshot_id',
-            'original_image_url', # 원본 이미지 URL (MEDIA_URL 기반)
-            'processed_image_url', # 처리된 이미지 URL (MEDIA_URL 기반)
+            'original_image_url',
+            'processed_image_url',
         ]
 
-    def get_media_url_or_none(self, image_path_field_value):
-        if image_path_field_value:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(f"{settings.MEDIA_URL}{image_path_field_value}")
-            # request가 없을 경우 (예: 테스트 등) 상대 경로만 반환하거나 절대 경로 구성 불가 처리
-            return f"{settings.MEDIA_URL}{image_path_field_value}"
-        return None
+    def get_processed_image_url(self, obj):
+        """
+        처리된 이미지(processed_image_path)의 완전한 URL을 생성합니다.
+        URL 경로의 시작을 '/analytics/'로 고정합니다.
+        """
+        if not obj.processed_image_path:
+            return None
+
+        # 윈도우 경로 구분자(\)를 웹 표준(/)으로 변경
+        relative_path = obj.processed_image_path.replace('\\', '/')
+
+        # URL 경로를 '/analytics/'로 시작하도록 직접 구성
+        url_path = f"/analytics/{relative_path}"
+
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(url_path)
+
+        # request 객체가 없을 경우 (테스트 환경 등)
+        return url_path
 
     def get_original_image_url(self, obj):
-        return self.get_media_url_or_none(obj.image_path)
+        """
+        원본 이미지(image_path)의 완전한 URL을 생성합니다.
+        DB에 'C:\\Users\\...\\SmartCCTV\\analytics\\...' 와 같은 절대 경로가 저장된 문제를 해결합니다.
+        """
+        if not obj.image_path:
+            return None
 
-    def get_processed_image_url(self, obj):
-        # Snapshots 모델의 processed_image_path 필드를 사용
-        return self.get_media_url_or_none(obj.processed_image_path)
+        absolute_path = obj.image_path
+        project_root_name = 'SmartCCTV'
 
+        try:
+            path_parts = absolute_path.split(project_root_name)
+            if len(path_parts) > 1:
+                relative_path = path_parts[1]
+            else:
+                relative_path = absolute_path
+
+            relative_path = relative_path.replace('\\', '/').lstrip('/')
+
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(f'/{relative_path}')
+
+            return f'/{relative_path}'
+
+        except Exception:
+            return None
 
 # GET /alerts/ API 응답용 Serializer
 class AlertSerializer(serializers.ModelSerializer):

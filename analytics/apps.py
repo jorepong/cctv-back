@@ -15,8 +15,8 @@ class AnalyticsConfig(AppConfig):
 
         # 기존 ROI 업데이트 스케줄링
         func_path = 'analytics.congestion_analysis_tasks.update_all_camera_rois_periodic_task'
-        schedule_name = 'Hourly ROI Update via Django-Q'
-        cron_schedule = '0 */1 * * *'
+        schedule_name = '1시간 주기 ROI 업데이트'
+        cron_schedule = '*/3 * * * *'
 
         if not Schedule.objects.filter(name=schedule_name).exists():
             schedule(
@@ -30,8 +30,8 @@ class AnalyticsConfig(AppConfig):
 
         # 새로운 카메라 캡처 스케줄링 (30초마다 모든 활성 카메라 캡처)
         capture_func_path = 'analytics.capture.capture_all_active_cameras_task'
-        capture_schedule_name = 'Camera Capture Every 30 Seconds'
-        capture_cron_schedule = '*/1 * * * *'  # 매 분마다 실행 (30초 간격을 위해 함수 내에서 처리)
+        capture_schedule_name = '1분 주기 스냅샷 캡처'
+        capture_cron_schedule = '*/1 * * * *'  # 매 분마다 실행
 
         if not Schedule.objects.filter(name=capture_schedule_name).exists():
             schedule(
